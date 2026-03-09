@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="theme-color" content="#0d1117">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Mon Stage</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Instrument+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --bg: #0d1117; --s1: #161b22; --s2: #1c2333; --s3: #21283a;
+    --border: #30363d; --border2: #3d4f6e;
+    --gold: #e8b84b; --gold2: #ffd26b;
+    --blue: #58a6ff; --green: #3fb950; --red: #f85149;
+    --orange: #f0883e; --purple: #bc8cff;
+    --text: #e6edf3; --muted: #7d8590; --muted2: #484f58;
+    --r: 12px; --rsm: 8px;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'Instrument Sans', sans-serif;
+    min-height: 100vh; overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+  body::before {
+    content: ''; position: fixed; top: -200px; left: -200px;
+    width: 600px; height: 600px;
+    background: radial-gradient(circle, rgba(232,184,75,0.06) 0%, transparent 70%);
+    pointer-events: none; z-index: 0;
+  }
+  body::after {
+    content: ''; position: fixed; bottom: -200px; right: -200px;
+    width: 500px; height: 500px;
+    background: radial-gradient(circle, rgba(88,166,255,0.05) 0%, transparent 70%);
+    pointer-events: none; z-index: 0;
+  }
+
+  /* ══ LOGIN ══ */
+  #login-screen {
+    position: fixed; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 0; z-index: 100; padding: 24px; background: var(--bg);
+  }
+  .login-card {
+    background: var(--s1); border: 1px solid var(--border);
+    border-radius: 20px; padding: 48px 40px;
+    max-width: 420px; width: 100%; text-align: center;
+    box-shadow: 0 24px 80px rgba(0,0,0,0.5);
+    animation: slideUp 0.5s ease;
+  }
+  @keyframes slideUp { from{opacity:0;transform:translateY(30px)} to{opacity:1;transform:translateY(0)} }
+  .login-logo { font-family:'Syne',serif; font-size:2.8rem; font-weight:800; color:var(--text); line-height:1; margin-bottom:8px; }
+  .login-logo span { color:var(--gold); }
+  .login-sub { color:var(--muted); font-size:0.95rem; margin-bottom:40px; }
+  .btn-google {
+    display:flex; align-items:center; justify-content:center; gap:12px;
+    width:100%; padding:14px 24px; background:#fff; color:#1a1a1a;
+    border:none; border-radius:var(--r);
+    font-family:'Instrument Sans',sans-serif; font-size:1rem; font-weight:600;
+    cursor:pointer; transition:all 0.2s; box-shadow:0 4px 16px rgba(0,0,0,0.3);
+  }
+  .btn-google:hover { transform:translateY(-2px); box-shadow:0 8px 28px rgba(0,0,0,0.4); }
+  .btn-google svg { width:20px; height:20px; flex-shrink:0; }
+  .login-note { color:var(--muted2); font-size:0.78rem; margin-top:20px; line-height:1.5; }
+  #login-error { color:var(--red); font-size:0.82rem; margin-top:14px; display:none; }
+
+  /* ══ APP ══ */
+  #app-screen { display:none; position:relative; z-index:1; }
+
+  /* ── TOPBAR ── */
+  .topbar {
+    position:sticky; top:0; z-index:50;
+    background:rgba(13,17,23,0.88); backdrop-filter:blur(16px);
+    -webkit-backdrop-filter:blur(16px);
+    border-bottom:1px solid var(--border);
+    padding:0 20px; height:60px;
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  .topbar-logo { font-family:'Syne',serif; font-size:1.35rem; font-weight:800; }
+  .topbar-logo span { color:var(--gold); }
+  .topbar-right { display:flex; align-items:center; gap:10px; }
+  .user-pill {
+    display:flex; align-items:center; gap:8px;
+    background:var(--s2); border:1px solid var(--border);
+    border-radius:30px; padding:4px 12px 4px 4px;
+  }
+  #user-avatar { width:28px; height:28px; border-radius:50%; object-fit:cover; display:none; }
+  #user-name { font-size:0.85rem; font-weight:500; }
+  .btn-logout {
+    background:none; border:none; color:var(--muted);
+    cursor:pointer; font-size:1rem; padding:4px; line-height:1;
+    transition:color 0.15s;
+  }
+  .btn-logout:hover { color:var(--red); }
+
+  /* ── TABS ── */
+  .tabs-bar {
+    display:flex; padding:12px 20px 0; gap:4px;
+    border-bottom:1px solid var(--border); background:var(--s1);
+  }
+  .tab-btn {
+    display:flex; align-items:center; gap:7px;
+    padding:10px 18px; border:none;
+    border-radius:var(--r) var(--r) 0 0;
+    background:transparent; color:var(--muted);
+    font-family:'Instrument Sans',sans-serif;
+    font-size:0.9rem; font-weight:500; cursor:pointer;
+    transition:all 0.2s; border-bottom:2px solid transparent;
+    margin-bottom:-1px; white-space:nowrap;
+  }
+  .tab-btn.active { color:var(--gold); border-bottom-color:var(--gold); background:rgba(232,184,75,0.06); }
+  .tab-btn:not(.active):hover { color:var(--text); background:rgba(255,255,255,0.03); }
+
+  /* ── CONTENT ── */
+  .content { padding:20px; max-width:1200px; margin:0 auto; }
+  .panel { display:none; animation:fadeIn 0.25s ease; }
+  .panel.active { display:block; }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+
+  /* ── PAGE HEADER ── */
+  .page-hdr {
+    display:flex; align-items:center; justify-content:space-between;
+    margin-bottom:16px; gap:12px; flex-wrap:wrap;
+  }
+  .page-title { font-family:'Syne',serif; font-size:1.5rem; font-weight:700; }
+
+  /* ── BUTTONS ── */
+  .btn {
+    display:inline-flex; align-items:center; gap:6px;
+    padding:9px 18px; border-radius:var(--rsm); border:none;
+    cursor:pointer; font-family:'Instrument Sans',sans-serif;
+    font-size:0.88rem; font-weight:600; transition:all 0.2s; white-space:nowrap;
+  }
+  .btn-gold { background:var(--gold); color:#0d1117; }
+  .btn-gold:hover { background:var(--gold2); transform:translateY(-1px); box-shadow:0 4px 16px rgba(232,184,75,0.35); }
+  .btn-ghost { background:var(--s2); color:var(--text); border:1px solid var(--border); }
+  .btn-ghost:hover { border-color:var(--gold); color:var(--gold); }
+  .icon-btn {
+    background:none; border:1px solid transparent; color:var(--muted);
+    cursor:pointer; border-radius:6px; padding:5px 7px;
+    font-size:0.9rem; transition:all 0.15s; line-height:1;
+  }
+  .icon-btn:hover { color:var(--gold); border-color:rgba(232,184,75,0.3); background:rgba(232,184,75,0.06); }
+  .icon-btn.del:hover { color:var(--red); border-color:rgba(248,81,73,0.3); background:rgba(248,81,73,0.06); }
+
+  /* ── FILTERS ── */
+  .filter-bar { display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; align-items:center; }
+  .filter-bar input, .filter-bar select { flex:1; min-width:130px; max-width:200px; }
+
+  /* ── INPUTS ── */
+  input, select, textarea {
+    background:var(--s2); border:1px solid var(--border);
+    border-radius:var(--rsm); color:var(--text);
+    font-family:'Instrument Sans',sans-serif;
+    font-size:0.9rem; padding:9px 12px;
+    outline:none; transition:border-color 0.2s; width:100%;
+  }
+  input:focus, select:focus, textarea:focus { border-color:var(--gold); }
+  select option { background:var(--s2); }
+  textarea { resize:vertical; min-height:80px; }
+  ::placeholder { color:var(--muted2); }
+
+  /* ── TABLE ── */
+  .tbl-wrap {
+    background:var(--s1); border:1px solid var(--border);
+    border-radius:var(--r); overflow:hidden; overflow-x:auto;
+  }
+  table { width:100%; border-collapse:collapse; min-width:700px; }
+  thead tr { background:var(--s2); }
+  th {
+    padding:11px 14px; text-align:left;
+    font-size:0.72rem; font-weight:600;
+    text-transform:uppercase; letter-spacing:0.08em;
+    color:var(--muted); border-bottom:1px solid var(--border); white-space:nowrap;
+  }
+  .group-row td {
+    background:rgba(232,184,75,0.05); border-bottom:1px solid var(--border);
+    padding:9px 14px; font-family:'Syne',serif;
+    font-size:0.8rem; font-weight:600;
+    color:var(--gold); letter-spacing:0.06em; text-transform:uppercase;
+  }
+  .group-label { display:flex; align-items:center; gap:8px; }
+  .gbadge {
+    background:rgba(232,184,75,0.12); border:1px solid rgba(232,184,75,0.25);
+    border-radius:4px; padding:1px 7px; font-size:0.68rem; font-weight:600;
+  }
+  .mrow { border-bottom:1px solid rgba(48,54,61,0.5); transition:background 0.12s; }
+  .mrow:last-child { border-bottom:none; }
+  .mrow:hover { background:rgba(255,255,255,0.02); }
+  .mrow td { padding:11px 14px; font-size:0.87rem; vertical-align:middle; }
+  .mrow.hl-yellow td { background:rgba(232,184,75,0.06); }
+  .mrow.hl-green td { background:rgba(63,185,80,0.06); }
+  .mrow .acts { display:flex; gap:3px; opacity:0; transition:opacity 0.15s; }
+  .mrow:hover .acts, .mrow:focus-within .acts { opacity:1; }
+  @media(max-width:768px){ .mrow .acts { opacity:1; } }
+
+  /* ── MISSION NAME ── */
+  .mname { display:flex; align-items:center; gap:8px; }
+  .mdot { width:7px; height:7px; border-radius:50%; background:var(--blue); flex-shrink:0; }
+  .mdot.y { background:var(--gold); }
+  .mdot.g { background:var(--green); }
+
+  /* ── EXPERT CHIP ── */
+  .echip {
+    display:inline-flex; align-items:center; gap:5px;
+    background:var(--s2); border:1px solid var(--border);
+    border-radius:20px; padding:3px 9px; font-size:0.78rem; color:var(--muted);
+  }
+  .eavatar {
+    width:17px; height:17px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-size:0.58rem; font-weight:700; color:#0d1117; flex-shrink:0;
+  }
+
+  /* ── BUBBLES ── */
+  .bubbles { display:flex; align-items:center; gap:5px; flex-wrap:wrap; }
+  .bubble {
+    width:27px; height:27px; border-radius:50%;
+    border:2px solid var(--border2); background:var(--s2); color:var(--muted);
+    font-size:0.72rem; font-weight:600;
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer; transition:all 0.18s; user-select:none; flex-shrink:0;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .bubble:hover { border-color:var(--blue); color:var(--blue); transform:scale(1.1); }
+  .bubble.done { background:var(--blue); border-color:var(--blue); color:#0d1117; }
+  .bedit { display:flex; align-items:center; gap:3px; margin-left:3px; }
+  .bedit button {
+    background:none; border:none; color:var(--muted);
+    cursor:pointer; font-size:1rem; padding:1px 3px; line-height:1;
+    transition:color 0.15s; -webkit-tap-highlight-color:transparent;
+  }
+  .bedit button:hover { color:var(--gold); }
+  .prog { display:flex; align-items:center; gap:6px; margin-left:6px; }
+  .pbar { width:50px; height:4px; background:var(--border); border-radius:2px; overflow:hidden; }
+  .pfill { height:100%; background:linear-gradient(90deg,var(--blue),var(--gold)); border-radius:2px; transition:width 0.3s; }
+  .plabel { font-size:0.72rem; color:var(--muted); white-space:nowrap; }
+
+  /* ── DEADLINE ── */
+  .dl {
+    display:inline-flex; align-items:center; gap:4px;
+    padding:3px 9px; border-radius:20px;
+    font-size:0.75rem; font-weight:600; white-space:nowrap;
+  }
+  .dl-ok { background:rgba(63,185,80,0.12); color:var(--green); border:1px solid rgba(63,185,80,0.25); }
+  .dl-warn { background:rgba(240,136,62,0.12); color:var(--orange); border:1px solid rgba(240,136,62,0.25); }
+  .dl-late { background:rgba(248,81,73,0.12); color:var(--red); border:1px solid rgba(248,81,73,0.25); }
+  .rmk { color:var(--muted); font-size:0.8rem; font-style:italic; max-width:160px; }
+
+  /* ══ MODAL ══ */
+  .overlay {
+    display:none; position:fixed; inset:0;
+    background:rgba(0,0,0,0.75); backdrop-filter:blur(8px);
+    z-index:200; align-items:center; justify-content:center; padding:16px;
+  }
+  .overlay.open { display:flex; animation:fadeIn 0.2s ease; }
+  .modal {
+    background:var(--s1); border:1px solid var(--border);
+    border-radius:16px; width:100%; max-width:560px;
+    max-height:92vh; overflow-y:auto;
+    box-shadow:0 24px 80px rgba(0,0,0,0.6);
+  }
+  .modal-hdr {
+    padding:18px 20px 14px; border-bottom:1px solid var(--border);
+    display:flex; align-items:center; justify-content:space-between;
+    position:sticky; top:0; background:var(--s1); z-index:1;
+  }
+  .modal-hdr h3 { font-family:'Syne',serif; font-size:1.15rem; font-weight:700; }
+  .mclose { background:none; border:none; color:var(--muted); cursor:pointer; font-size:1.3rem; line-height:1; transition:color 0.15s; padding:2px; }
+  .mclose:hover { color:var(--red); }
+  .modal-body { padding:18px 20px; display:flex; flex-direction:column; gap:14px; }
+  .modal-ftr { padding:14px 20px; border-top:1px solid var(--border); display:flex; gap:8px; justify-content:flex-end; }
+  .frow { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .fgrp { display:flex; flex-direction:column; gap:5px; }
+  .fgrp.full { grid-column:1/-1; }
+  label { font-size:0.75rem; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:0.07em; }
+  @media(max-width:500px){ .frow{grid-template-columns:1fr} .fgrp.full{grid-column:1} }
+
+  /* ══ REUNIONS ══ */
+  .reun-layout { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+  @media(max-width:800px){ .reun-layout{grid-template-columns:1fr} }
+  .card { background:var(--s1); border:1px solid var(--border); border-radius:var(--r); overflow:hidden; }
+  .card-hdr {
+    padding:14px 18px; border-bottom:1px solid var(--border);
+    background:var(--s2); display:flex; align-items:center; justify-content:space-between;
+  }
+  .card-title { font-family:'Syne',serif; font-size:1rem; font-weight:600; }
+  .card-body { padding:14px 16px; }
+
+  /* Participants */
+  .pgroup { background:var(--s2); border:1px solid var(--border); border-radius:var(--rsm); margin-bottom:10px; overflow:hidden; }
+  .phdr {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:11px 14px; cursor:pointer; transition:background 0.12s;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .phdr:hover { background:rgba(255,255,255,0.03); }
+  .pinfo { display:flex; align-items:center; gap:10px; }
+  .pavatar {
+    width:34px; height:34px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-size:0.82rem; font-weight:700; color:#0d1117; flex-shrink:0;
+  }
+  .pname { font-weight:600; font-size:0.9rem; }
+  .pcount { font-size:0.76rem; color:var(--muted); margin-top:1px; }
+  .pbadge { background:rgba(232,184,75,0.12); color:var(--gold); border:1px solid rgba(232,184,75,0.25); border-radius:12px; padding:2px 9px; font-size:0.75rem; font-weight:600; }
+  .chevron { color:var(--muted); transition:transform 0.2s; font-size:0.85rem; }
+  .pgroup.open .chevron { transform:rotate(180deg); }
+  .plist { display:none; border-top:1px solid var(--border); }
+  .pgroup.open .plist { display:block; }
+  .pitem {
+    padding:9px 14px 9px 58px; border-bottom:1px solid rgba(48,54,61,0.4);
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    transition:background 0.12s;
+  }
+  .pitem:last-child { border-bottom:none; }
+  .pitem:hover { background:rgba(255,255,255,0.02); }
+  .dpill { background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:3px 8px; font-size:0.76rem; color:var(--blue); white-space:nowrap; flex-shrink:0; }
+  .psubj { font-size:0.84rem; flex:1; }
+  .pacts { display:flex; gap:3px; opacity:0; transition:opacity 0.15s; }
+  .pitem:hover .pacts { opacity:1; }
+  @media(max-width:768px){ .pacts{opacity:1} }
+
+  /* Journal */
+  .note-toolbar { display:flex; gap:7px; margin-bottom:12px; flex-wrap:wrap; }
+  .note-toolbar input { flex:1; min-width:100px; }
+  .note-toolbar select { min-width:120px; max-width:150px; }
+  .note-card {
+    background:var(--s2); border:1px solid var(--border);
+    border-radius:var(--rsm); padding:14px; margin-bottom:10px;
+    position:relative; transition:border-color 0.15s;
+  }
+  .note-card:hover { border-color:rgba(232,184,75,0.3); }
+  .nmeta { display:flex; align-items:center; gap:8px; margin-bottom:8px; flex-wrap:wrap; }
+  .nsubj { font-weight:600; font-size:0.9rem; }
+  .nwith { display:flex; align-items:center; gap:5px; font-size:0.78rem; color:var(--muted); }
+  .ncontent { font-size:0.85rem; color:var(--muted); line-height:1.6; white-space:pre-wrap; margin-top:8px; }
+  .nacts { position:absolute; top:10px; right:10px; display:flex; gap:3px; opacity:0; transition:opacity 0.15s; }
+  .note-card:hover .nacts { opacity:1; }
+  @media(max-width:768px){ .nacts{opacity:1} }
+
+  /* Empty */
+  .empty { text-align:center; padding:32px 16px; color:var(--muted); font-size:0.88rem; }
+  .empty-icon { font-size:2.2rem; display:block; margin-bottom:8px; }
+
+  /* ── LOADER ── */
+  .loader {
+    display:inline-block; width:18px; height:18px;
+    border:2px solid var(--border); border-top-color:var(--gold);
+    border-radius:50%; animation:spin 0.7s linear infinite;
+  }
+  @keyframes spin { to{transform:rotate(360deg)} }
+  .loading-overlay {
+    position:fixed; inset:0; background:rgba(13,17,23,0.7);
+    display:flex; align-items:center; justify-content:center;
+    z-index:300; backdrop-filter:blur(4px); display:none;
+  }
+  .loading-overlay.show { display:flex; }
+
+  /* ── TOAST ── */
+  .toast {
+    position:fixed; bottom:24px; right:20px;
+    background:var(--orange); color:#0d1117;
+    padding:12px 18px; border-radius:var(--rsm);
+    font-weight:600; font-size:0.88rem; z-index:9999;
+    box-shadow:0 8px 32px rgba(240,136,62,0.45);
+    display:flex; align-items:center; gap:8px;
+    transform:translateX(calc(100% + 30px)); transition:transform 0.3s ease;
+    max-width:min(360px, calc(100vw - 40px));
+  }
+  .toast.show { transform:translateX(0); }
+  .toast.success { background:var(--green); box-shadow:0 8px 32px rgba(63,185,80,0.45); }
+  .toast.danger { background:var(--red); color:#fff; box-shadow:0 8px 32px rgba(248,81,73,0.45); }
+
+  /* ── SCROLLBAR ── */
+  ::-webkit-scrollbar { width:5px; height:5px; }
+  ::-webkit-scrollbar-track { background:var(--s1); }
+  ::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
+
+  /* ── MOBILE ── */
+  @media(max-width:600px){
+    .tabs-bar { display:none; }
+    .bottomnav {
+      position:fixed; bottom:0; left:0; right:0;
+      background:rgba(13,17,23,0.95); backdrop-filter:blur(16px);
+      border-top:1px solid var(--border); display:flex; z-index:50;
+      padding-bottom:env(safe-area-inset-bottom);
+    }
+    .bnav-btn {
+      flex:1; display:flex; flex-direction:column; align-items:center; gap:3px;
+      padding:10px 4px; background:none; border:none; color:var(--muted);
+      cursor:pointer; font-family:'Instrument Sans',sans-serif;
+      font-size:0.68rem; font-weight:500; transition:color 0.15s;
+      -webkit-tap-highlight-color:transparent;
+    }
+    .bnav-btn.active { color:var(--gold); }
+    .bnav-icon { font-size:1.35rem; }
+    .content { padding:14px 14px 80px; }
+    .topbar { padding:0 14px; }
+    .toast { bottom:80px; }
+  }
+  @media(min-width:601px){ .bottomnav{display:none} }
+</style>
+</head>
+<body>
+
+<!-- Loading -->
+<div class="loading-overlay" id="loading"><div class="loader"></div></div>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">Mon<span>Stage</span></div>
+    <p class="login-sub">Suivi de missions & réunions</p>
+    <button class="btn-google" onclick="loginGoogle()">
+      <svg viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+      Continuer avec Google
+    </button>
+    <div id="login-error"></div>
+    <p class="login-note">Données synchronisées en temps réel 🔄<br>entre tous tes appareils</p>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app-screen">
+  <div class="topbar">
+    <div class="topbar-logo">Mon<span>Stage</span></div>
+    <div class="topbar-right">
+      <div class="user-pill">
+        <img id="user-avatar" src="" alt="">
+        <span id="user-name">Moi</span>
+      </div>
+      <button class="btn-logout" onclick="logout()" title="Déconnexion">⏻</button>
+    </div>
+  </div>
+
+  <div class="tabs-bar">
+    <button class="tab-btn active" onclick="switchTab('missions',this)">📋 Missions</button>
+    <button class="tab-btn" onclick="switchTab('reunions',this)">🤝 Réunions</button>
+  </div>
+
+  <div class="content">
+    <!-- MISSIONS -->
+    <div class="panel active" id="panel-missions">
+      <div class="page-hdr">
+        <div class="page-title">Mes Missions</div>
+        <button class="btn btn-gold" onclick="openMM()">＋ Nouvelle mission</button>
+      </div>
+      <div class="filter-bar">
+        <input type="text" id="m-search" placeholder="🔍 Rechercher…" oninput="renderMissions()">
+        <select id="m-fg" onchange="renderMissions()"><option value="">Tous les groupes</option></select>
+        <select id="m-fe" onchange="renderMissions()"><option value="">Tous les experts</option></select>
+      </div>
+      <div class="tbl-wrap">
+        <table><thead><tr>
+          <th></th><th>Mission</th><th>Expert</th>
+          <th>Début</th><th>Fin prévue</th><th>Deadline</th>
+          <th>Jours</th><th>Remarques</th><th></th>
+        </tr></thead>
+        <tbody id="m-tbody"></tbody></table>
+      </div>
+    </div>
+
+    <!-- REUNIONS -->
+    <div class="panel" id="panel-reunions">
+      <div class="page-hdr">
+        <div class="page-title">Mes Réunions</div>
+        <button class="btn btn-gold" onclick="openRM()">＋ Nouvelle réunion</button>
+      </div>
+      <div class="reun-layout">
+        <div>
+          <div class="card">
+            <div class="card-hdr">
+              <span class="card-title">👥 Par Participant</span>
+              <span id="r-count" style="font-size:0.8rem;color:var(--muted)"></span>
+            </div>
+            <div class="card-body" id="r-plist" style="padding:10px 12px"></div>
+          </div>
+        </div>
+        <div>
+          <div class="card">
+            <div class="card-hdr"><span class="card-title">📓 Journal</span></div>
+            <div class="card-body">
+              <div class="note-toolbar">
+                <input type="text" id="n-search" placeholder="🔍 Rechercher…" oninput="renderNotes()">
+                <select id="n-fp" onchange="renderNotes()"><option value="">Toutes</option></select>
+                <select id="n-sort" onchange="renderNotes()">
+                  <option value="date-desc">Date ↓</option>
+                  <option value="date-asc">Date ↑</option>
+                  <option value="person">Personne</option>
+                  <option value="subject">Sujet</option>
+                </select>
+              </div>
+              <div id="n-list"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mobile nav -->
+  <div class="bottomnav">
+    <button class="bnav-btn active" onclick="switchTab('missions',this)"><span class="bnav-icon">📋</span>Missions</button>
+    <button class="bnav-btn" onclick="switchTab('reunions',this)"><span class="bnav-icon">🤝</span>Réunions</button>
+  </div>
+</div>
+
+<!-- MISSION MODAL -->
+<div class="overlay" id="ovM">
+  <div class="modal">
+    <div class="modal-hdr"><h3 id="mm-title">Nouvelle Mission</h3><button class="mclose" onclick="closeM()">✕</button></div>
+    <div class="modal-body">
+      <div class="fgrp full"><label>Groupe / Catégorie</label><input id="mm-group" placeholder="Ex: POLE, AT, P25-77…" list="dl-groups"><datalist id="dl-groups"></datalist></div>
+      <div class="fgrp full"><label>Nom de la mission</label><input id="mm-name" placeholder="Ex: STAFF ET INTERSTICIEL"></div>
+      <div class="frow">
+        <div class="fgrp"><label>Expert</label><input id="mm-expert" placeholder="Ex: REMI, LORENA…" list="dl-experts"><datalist id="dl-experts"></datalist></div>
+        <div class="fgrp"><label>Jours attribués</label><input type="number" id="mm-days" min="1" max="30" value="2"></div>
+      </div>
+      <div class="frow">
+        <div class="fgrp"><label>Date de début</label><input type="date" id="mm-start"></div>
+        <div class="fgrp"><label>Date de fin prévue</label><input type="date" id="mm-end"></div>
+      </div>
+      <div class="fgrp full"><label>Couleur</label>
+        <select id="mm-color"><option value="">Aucune</option><option value="hl-yellow">🟡 Jaune</option><option value="hl-green">🟢 Vert</option></select>
+      </div>
+      <div class="fgrp full"><label>Remarques</label><textarea id="mm-remark" placeholder="Notes…"></textarea></div>
+    </div>
+    <div class="modal-ftr">
+      <button class="btn btn-ghost" onclick="closeM()">Annuler</button>
+      <button class="btn btn-gold" onclick="saveM()">💾 Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- REUNION MODAL -->
+<div class="overlay" id="ovR">
+  <div class="modal">
+    <div class="modal-hdr"><h3 id="rm-title">Nouvelle Réunion</h3><button class="mclose" onclick="closeR()">✕</button></div>
+    <div class="modal-body">
+      <div class="frow">
+        <div class="fgrp"><label>Participant</label><input id="rm-person" placeholder="Ex: Loréna, Rémi…" list="dl-persons"><datalist id="dl-persons"></datalist></div>
+        <div class="fgrp"><label>Date</label><input type="date" id="rm-date"></div>
+      </div>
+      <div class="fgrp full"><label>Sujet</label><input id="rm-subject" placeholder="Sujet de la réunion"></div>
+      <div class="fgrp full"><label>Notes / Compte-rendu</label><textarea id="rm-content" placeholder="Ce qu'on a discuté…" style="min-height:110px"></textarea></div>
+    </div>
+    <div class="modal-ftr">
+      <button class="btn btn-ghost" onclick="closeR()">Annuler</button>
+      <button class="btn btn-gold" onclick="saveR()">💾 Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"><span id="toast-msg"></span></div>
+
+<script>
+// ══════════════════════════════════════
+// SUPABASE CONFIG
+// ══════════════════════════════════════
+const SUPABASE_URL = 'https://gqfpvvdvqhfbvtaclmoq.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_v8lqwWJ3R7T6RbcwJVd75w_uD0u5ihr';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ── STATE ──
+let missions = [];
+let reunions = [];
+let currentUser = null;
+let editMId = null;
+let editRId = null;
+
+// ── UTILS ──
+function uid() { return crypto.randomUUID(); }
+function today() { return new Date().toISOString().split('T')[0]; }
+function fmtDate(d) {
+  if (!d) return '—';
+  return new Date(d).toLocaleDateString('fr-FR', {day:'2-digit',month:'short',year:'numeric'});
+}
+function initials(n) { return (n||'?').trim().split(/\s+/).map(w=>w[0]).join('').toUpperCase().slice(0,2); }
+const ACOLORS = ['#e8b84b','#58a6ff','#3fb950','#f48fb1','#bc8cff','#ffcc80','#80cbc4','#f0883e'];
+function aColor(n) { let h=0; for(let c of (n||'')) h=(h*31+c.charCodeAt(0))%ACOLORS.length; return ACOLORS[h]; }
+function loading(show) { document.getElementById('loading').classList.toggle('show', show); }
+
+// ══ AUTH ══
+async function loginGoogle() {
+  const err = document.getElementById('login-error');
+  err.style.display = 'none';
+  loading(true);
+  const { error } = await sb.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo: window.location.href }
+  });
+  if (error) {
+    err.textContent = '❌ ' + error.message;
+    err.style.display = 'block';
+    loading(false);
+  }
+}
+
+async function logout() {
+  await sb.auth.signOut();
+  location.reload();
+}
+
+// Auth state
+sb.auth.onAuthStateChange(async (event, session) => {
+  loading(false);
+  if (session?.user) {
+    currentUser = session.user;
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app-screen').style.display = 'block';
+    const name = session.user.user_metadata?.full_name?.split(' ')[0] || 'Moi';
+    document.getElementById('user-name').textContent = name;
+    const avatar = session.user.user_metadata?.avatar_url;
+    if (avatar) {
+      const img = document.getElementById('user-avatar');
+      img.src = avatar; img.style.display = 'block';
+    }
+    await ensureTables();
+    await loadData();
+  }
+});
+
+// ── TABLES ──
+async function ensureTables() {
+  // Create tables via RPC if they don't exist
+  await sb.rpc('create_tables_if_needed').catch(() => {});
+  // We use direct inserts; tables created via SQL editor
+}
+
+// ── LOAD DATA ──
+async function loadData() {
+  loading(true);
+  const uid = currentUser.id;
+
+  const [{ data: m }, { data: r }] = await Promise.all([
+    sb.from('missions').select('*').eq('user_id', uid).order('grp').order('created_at'),
+    sb.from('reunions').select('*').eq('user_id', uid).order('date', { ascending: false })
+  ]);
+
+  missions = m || [];
+  reunions = r || [];
+
+  if (missions.length === 0) await seedMissions();
+
+  renderMissions();
+  renderReunions();
+  updateFilters();
+  loading(false);
+}
+
+// ── SEED ──
+async function seedMissions() {
+  const seed = [
+    {grp:'CONGES',name:'Congés',expert:'',days:2,color:'',remark:''},
+    {grp:'POLE',name:'STAFF ET INTERSTICIEL',expert:'',days:1,color:'',remark:''},
+    {grp:'POLE',name:'ABAQUES (REMI)',expert:'REMI',days:1,color:'',remark:''},
+    {grp:'POLE',name:'FICHES DE BONNES PRATIQUES (P2577 - 14 FBP Log durable (CEDRIC))',expert:'CEDRIC',days:2,color:'',remark:''},
+    {grp:'AT',name:'GUYANE (en lien avec COOPERATION LOG GHT)',expert:'',days:1,color:'hl-yellow',remark:''},
+    {grp:'AT',name:'COMPIEGNE (en lien avec COOPERATION LOG GHT)',expert:'',days:1,color:'hl-yellow',remark:''},
+    {grp:'P25-77',name:'COOPERATION LOG GHT (Projet stage) (LORENA)',expert:'LORENA',days:3,color:'',remark:''},
+    {grp:'P25-77',name:'PANORAMA INTERNATIONAL (LORENA)',expert:'LORENA',days:3,color:'',remark:''},
+    {grp:'P25-77',name:'KIT SUPPLY CHAIN (LORENA)',expert:'LORENA',days:3,color:'',remark:''},
+    {grp:'P25-77',name:'BENCHMARK LOG. PUBLIC-PRIVE (REMI)',expert:'REMI',days:2,color:'hl-yellow',remark:''},
+    {grp:'P25-77',name:'MODERNISATION LOG (REMI)',expert:'REMI',days:2,color:'hl-yellow',remark:''},
+    {grp:'P25-78',name:"PANORAMA DES CENTRALES D'ACHATS (MARIE)",expert:'MARIE',days:3,color:'hl-green',remark:''},
+  ];
+  const rows = seed.map(s => ({
+    id: uid(), user_id: currentUser.id,
+    checked: [], start_date: null, end_date: null, ...s
+  }));
+  const { data, error } = await sb.from('missions').insert(rows).select();
+  if (!error && data) missions = data;
+}
+
+// ══ MISSIONS RENDER ══
+function renderMissions() {
+  const search = (document.getElementById('m-search').value||'').toLowerCase();
+  const fg = document.getElementById('m-fg').value;
+  const fe = document.getElementById('m-fe').value;
+
+  const grouped = {};
+  missions.forEach(m => {
+    if (fg && m.grp !== fg) return;
+    if (fe && m.expert !== fe) return;
+    if (search && !m.name?.toLowerCase().includes(search) && !m.grp?.toLowerCase().includes(search) && !(m.expert||'').toLowerCase().includes(search)) return;
+    if (!grouped[m.grp]) grouped[m.grp] = [];
+    grouped[m.grp].push(m);
+  });
+
+  const tbody = document.getElementById('m-tbody');
+  tbody.innerHTML = '';
+
+  if (!Object.keys(grouped).length) {
+    tbody.innerHTML = `<tr><td colspan="9"><div class="empty"><span class="empty-icon">📭</span>Aucune mission</div></td></tr>`;
+    return;
+  }
+
+  for (const [grp, items] of Object.entries(grouped)) {
+    const gr = document.createElement('tr');
+    gr.className = 'group-row';
+    gr.innerHTML = `<td colspan="9"><div class="group-label">📁 ${grp}<span class="gbadge">${items.length}</span></div></td>`;
+    tbody.appendChild(gr);
+    items.forEach(m => {
+      const tr = document.createElement('tr');
+      tr.className = 'mrow' + (m.color ? ' '+m.color : '');
+      const dotCls = m.color==='hl-yellow'?'y':m.color==='hl-green'?'g':'';
+      const expertHtml = m.expert
+        ? `<div class="echip"><div class="eavatar" style="background:${aColor(m.expert)}">${initials(m.expert)}</div>${m.expert}</div>`
+        : '<span style="color:var(--muted)">—</span>';
+      tr.innerHTML = `
+        <td></td>
+        <td><div class="mname"><div class="mdot ${dotCls}"></div><span>${m.name||''}</span></div></td>
+        <td>${expertHtml}</td>
+        <td style="color:var(--muted);font-size:0.82rem">${fmtDate(m.start_date)}</td>
+        <td style="color:var(--muted);font-size:0.82rem">${fmtDate(m.end_date)}</td>
+        <td>${dlBadge(m.end_date)}</td>
+        <td><div class="bubbles" id="bb-${m.id}"></div></td>
+        <td><span class="rmk">${m.remark||''}</span></td>
+        <td><div class="acts">
+          <button class="icon-btn" onclick="openMM('${m.id}')">✏️</button>
+          <button class="icon-btn del" onclick="delM('${m.id}')">🗑️</button>
+        </div></td>`;
+      tbody.appendChild(tr);
+      renderBubbles(m);
+    });
+  }
+}
+
+function dlBadge(d) {
+  if (!d) return '<span style="color:var(--muted)">—</span>';
+  const diff = Math.ceil((new Date(d) - new Date()) / 86400000);
+  let cls='dl-ok',ico='✅';
+  if(diff<0){cls='dl-late';ico='🔴';}
+  else if(diff<=7){cls='dl-warn';ico='⚠️';}
+  const lbl = diff<0?`${Math.abs(diff)}j retard`:diff===0?"Auj.":`Dans ${diff}j`;
+  return `<span class="dl ${cls}">${ico} ${lbl}</span>`;
+}
+
+function renderBubbles(m) {
+  const c = document.getElementById('bb-'+m.id);
+  if (!c) return;
+  c.innerHTML = '';
+  const checked = m.checked || [];
+  for (let i=1; i<=(m.days||1); i++) {
+    const b = document.createElement('div');
+    b.className = 'bubble' + (checked.includes(i)?' done':'');
+    b.textContent = i;
+    b.onclick = () => toggleBubble(m.id, i);
+    c.appendChild(b);
+  }
+  const be = document.createElement('div');
+  be.className = 'bedit';
+  be.innerHTML = `<button onclick="chDays('${m.id}',-1)">−</button><button onclick="chDays('${m.id}',1)">+</button>`;
+  c.appendChild(be);
+  const pct = m.days ? Math.round((checked.length/m.days)*100) : 0;
+  const pg = document.createElement('div');
+  pg.className = 'prog';
+  pg.innerHTML = `<div class="pbar"><div class="pfill" style="width:${pct}%"></div></div><span class="plabel">${checked.length}/${m.days||0}</span>`;
+  c.appendChild(pg);
+}
+
+async function toggleBubble(id, day) {
+  const m = missions.find(x=>x.id===id);
+  if (!m) return;
+  const checked = [...(m.checked||[])];
+  const idx = checked.indexOf(day);
+  if (idx===-1) checked.push(day); else checked.splice(idx,1);
+  checked.sort((a,b)=>a-b);
+  m.checked = checked;
+  await sb.from('missions').update({checked}).eq('id', id);
+  const rem = (m.days||0) - checked.length;
+  if (rem===1) showToast(`⚠️ Il te reste plus qu'1 jour sur « ${m.name} » !`);
+  else if (rem===0) showToast(`✅ Tous les jours de « ${m.name} » sont cochés !`, 'success');
+  renderBubbles(m);
+}
+
+async function chDays(id, d) {
+  const m = missions.find(x=>x.id===id);
+  if (!m) return;
+  m.days = Math.max(1, Math.min(30, (m.days||1)+d));
+  m.checked = (m.checked||[]).filter(c=>c<=m.days);
+  await sb.from('missions').update({days:m.days, checked:m.checked}).eq('id', id);
+  renderBubbles(m);
+}
+
+async function delM(id) {
+  if (!confirm('Supprimer cette mission ?')) return;
+  await sb.from('missions').delete().eq('id', id);
+  missions = missions.filter(m=>m.id!==id);
+  renderMissions(); updateFilters();
+}
+
+// ── FILTERS ──
+function updateFilters() {
+  const groups = [...new Set(missions.map(x=>x.grp).filter(Boolean))];
+  const sel1=document.getElementById('m-fg'); const v1=sel1.value;
+  sel1.innerHTML='<option value="">Tous les groupes</option>'+groups.map(g=>`<option value="${g}" ${g===v1?'selected':''}>${g}</option>`).join('');
+  const experts=[...new Set(missions.map(x=>x.expert).filter(Boolean))];
+  const sel2=document.getElementById('m-fe'); const v2=sel2.value;
+  sel2.innerHTML='<option value="">Tous les experts</option>'+experts.map(e=>`<option value="${e}" ${e===v2?'selected':''}>${e}</option>`).join('');
+  document.getElementById('dl-groups').innerHTML=groups.map(g=>`<option value="${g}">`).join('');
+  document.getElementById('dl-experts').innerHTML=experts.map(e=>`<option value="${e}">`).join('');
+  const persons=[...new Set(reunions.map(r=>r.person).filter(Boolean))];
+  const sel3=document.getElementById('n-fp'); const v3=sel3.value;
+  sel3.innerHTML='<option value="">Toutes</option>'+persons.map(p=>`<option value="${p}" ${p===v3?'selected':''}>${p}</option>`).join('');
+  document.getElementById('dl-persons').innerHTML=persons.map(p=>`<option value="${p}">`).join('');
+}
+
+// ── MISSION MODAL ──
+function openMM(id=null) {
+  editMId=id;
+  const m=id?missions.find(x=>x.id===id):null;
+  document.getElementById('mm-title').textContent=m?'Modifier la mission':'Nouvelle mission';
+  document.getElementById('mm-group').value=m?.grp||'';
+  document.getElementById('mm-name').value=m?.name||'';
+  document.getElementById('mm-expert').value=m?.expert||'';
+  document.getElementById('mm-days').value=m?.days||1;
+  document.getElementById('mm-start').value=m?.start_date||today();
+  document.getElementById('mm-end').value=m?.end_date||'';
+  document.getElementById('mm-color').value=m?.color||'';
+  document.getElementById('mm-remark').value=m?.remark||'';
+  document.getElementById('ovM').classList.add('open');
+}
+function closeM(){document.getElementById('ovM').classList.remove('open');editMId=null;}
+
+async function saveM() {
+  const name=(document.getElementById('mm-name').value||'').trim();
+  const grp=(document.getElementById('mm-group').value||'').trim();
+  if(!name||!grp){alert('Nom et groupe requis.');return;}
+  const data = {
+    grp, name,
+    expert:(document.getElementById('mm-expert').value||'').trim(),
+    days:parseInt(document.getElementById('mm-days').value)||1,
+    start_date:document.getElementById('mm-start').value||null,
+    end_date:document.getElementById('mm-end').value||null,
+    color:document.getElementById('mm-color').value,
+    remark:(document.getElementById('mm-remark').value||'').trim(),
+    user_id: currentUser.id,
+  };
+  loading(true);
+  if (editMId) {
+    const {error} = await sb.from('missions').update(data).eq('id', editMId);
+    if (!error) { const m=missions.find(x=>x.id===editMId); Object.assign(m, data); }
+  } else {
+    const {data:row, error} = await sb.from('missions').insert({id:uid(), checked:[], ...data}).select().single();
+    if (!error && row) missions.push(row);
+  }
+  loading(false);
+  closeM(); renderMissions(); updateFilters();
+}
+
+// ══ REUNIONS ══
+function renderReunions() { renderParticipants(); renderNotes(); updateFilters(); }
+
+function renderParticipants() {
+  const c=document.getElementById('r-plist');
+  const byP={};
+  reunions.forEach(r=>{const p=r.person||'Inconnu'; if(!byP[p])byP[p]=[]; byP[p].push(r);});
+  const sorted=Object.entries(byP).sort(([,a],[,b])=>{
+    const nA=a.map(r=>r.date).filter(Boolean).sort()[0]||'9999';
+    const nB=b.map(r=>r.date).filter(Boolean).sort()[0]||'9999';
+    return nA.localeCompare(nB);
+  });
+  document.getElementById('r-count').textContent=`${reunions.length} réunion${reunions.length>1?'s':''}`;
+  if(!sorted.length){c.innerHTML=`<div class="empty"><span class="empty-icon">📅</span>Aucune réunion</div>`;return;}
+  c.innerHTML='';
+  sorted.forEach(([person,reus],i)=>{
+    const col=aColor(person);
+    const next=reus.map(r=>r.date).filter(Boolean).sort()[0];
+    const div=document.createElement('div');
+    div.className='pgroup'+(i===0?' open':'');
+    div.innerHTML=`
+      <div class="phdr" onclick="this.closest('.pgroup').classList.toggle('open')">
+        <div class="pinfo">
+          <div class="pavatar" style="background:${col}">${initials(person)}</div>
+          <div><div class="pname">${person}</div><div class="pcount">${reus.length} réunion${reus.length>1?'s':''}${next?' · Prochaine : '+fmtDate(next):''}</div></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:7px"><span class="pbadge">${reus.length}</span><span class="chevron">▾</span></div>
+      </div>
+      <div class="plist">${reus.sort((a,b)=>(a.date||'').localeCompare(b.date||'')).map(r=>`
+        <div class="pitem">
+          <span class="dpill">📅 ${fmtDate(r.date)}</span>
+          <span class="psubj">${r.subject||'Sans titre'}</span>
+          <div class="pacts">
+            <button class="icon-btn" onclick="openRM('${r.id}')">✏️</button>
+            <button class="icon-btn del" onclick="delR('${r.id}')">🗑️</button>
+          </div>
+        </div>`).join('')}</div>`;
+    c.appendChild(div);
+  });
+}
+
+function renderNotes() {
+  const search=(document.getElementById('n-search').value||'').toLowerCase();
+  const fp=document.getElementById('n-fp').value;
+  const sort=document.getElementById('n-sort').value;
+  let f=reunions.filter(r=>{
+    if(fp&&r.person!==fp)return false;
+    if(search)return(r.subject||'').toLowerCase().includes(search)||(r.content||'').toLowerCase().includes(search)||(r.person||'').toLowerCase().includes(search);
+    return true;
+  });
+  f.sort((a,b)=>{
+    if(sort==='date-desc')return(b.date||'').localeCompare(a.date||'');
+    if(sort==='date-asc')return(a.date||'').localeCompare(b.date||'');
+    if(sort==='person')return(a.person||'').localeCompare(b.person||'');
+    if(sort==='subject')return(a.subject||'').localeCompare(b.subject||'');
+    return 0;
+  });
+  const c=document.getElementById('n-list');
+  if(!f.length){c.innerHTML=`<div class="empty"><span class="empty-icon">📝</span>Aucune note</div>`;return;}
+  c.innerHTML=f.map(r=>{
+    const col=aColor(r.person||'?');
+    return `<div class="note-card">
+      <div class="nacts"><button class="icon-btn" onclick="openRM('${r.id}')">✏️</button><button class="icon-btn del" onclick="delR('${r.id}')">🗑️</button></div>
+      <div class="nmeta">${r.date?`<span class="dpill">📅 ${fmtDate(r.date)}</span>`:''}<span class="nsubj">${r.subject||'Sans titre'}</span></div>
+      ${r.person?`<div class="nwith"><div class="pavatar" style="background:${col};width:20px;height:20px;font-size:0.6rem">${initials(r.person)}</div>Avec ${r.person}</div>`:''}
+      ${r.content?`<div class="ncontent">${esc(r.content)}</div>`:''}
+    </div>`;
+  }).join('');
+}
+
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');}
+
+async function delR(id) {
+  if(!confirm('Supprimer ?'))return;
+  await sb.from('reunions').delete().eq('id',id);
+  reunions=reunions.filter(r=>r.id!==id);
+  renderReunions();
+}
+
+function openRM(id=null) {
+  editRId=id;
+  const r=id?reunions.find(x=>x.id===id):null;
+  document.getElementById('rm-title').textContent=r?'Modifier la réunion':'Nouvelle réunion';
+  document.getElementById('rm-person').value=r?.person||'';
+  document.getElementById('rm-date').value=r?.date||today();
+  document.getElementById('rm-subject').value=r?.subject||'';
+  document.getElementById('rm-content').value=r?.content||'';
+  document.getElementById('ovR').classList.add('open');
+}
+function closeR(){document.getElementById('ovR').classList.remove('open');editRId=null;}
+
+async function saveR() {
+  const person=(document.getElementById('rm-person').value||'').trim();
+  if(!person){alert('Participant requis.');return;}
+  const data={person, date:document.getElementById('rm-date').value||null, subject:(document.getElementById('rm-subject').value||'').trim(), content:(document.getElementById('rm-content').value||'').trim(), user_id:currentUser.id};
+  loading(true);
+  if(editRId){
+    const {error}=await sb.from('reunions').update(data).eq('id',editRId);
+    if(!error){const r=reunions.find(x=>x.id===editRId);Object.assign(r,data);}
+  } else {
+    const {data:row,error}=await sb.from('reunions').insert({id:uid(),...data}).select().single();
+    if(!error&&row)reunions.push(row);
+  }
+  loading(false); closeR(); renderReunions(); updateFilters();
+}
+
+// ── TABS ──
+function switchTab(tab) {
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn,.bnav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('panel-'+tab).classList.add('active');
+  document.querySelectorAll(`[onclick*="'${tab}'"]`).forEach(b=>b.classList.add('active'));
+}
+
+// Close modals
+document.querySelectorAll('.overlay').forEach(o=>{o.addEventListener('click',e=>{if(e.target===o){closeM();closeR();}});});
+
+// Toast
+let toastTimer;
+function showToast(msg,type='warning'){
+  clearTimeout(toastTimer);
+  const t=document.getElementById('toast');
+  document.getElementById('toast-msg').textContent=msg;
+  t.className='toast show'+(type==='success'?' success':type==='danger'?' danger':'');
+  toastTimer=setTimeout(()=>t.classList.remove('show'),4500);
+}
+</script>
+</body>
+</html>
