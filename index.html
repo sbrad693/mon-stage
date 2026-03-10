@@ -626,6 +626,27 @@ sb.auth.onAuthStateChange(async (event, session) => {
   }
 });
 
+// Check session on page load
+(async () => {
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) {
+    loading(false);
+    currentUser = session.user;
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app-screen').style.display = 'block';
+    const name = session.user.user_metadata?.full_name?.split(' ')[0] || 'Moi';
+    document.getElementById('user-name').textContent = name;
+    const avatar = session.user.user_metadata?.avatar_url;
+    if (avatar) {
+      const img = document.getElementById('user-avatar');
+      img.src = avatar;
+      img.style.display = 'block';
+    }
+    await ensureTables();
+    await loadData();
+  }
+})();
+
 // ── TABLES ──
 async function ensureTables() {
   // Create tables via RPC if they don't exist
