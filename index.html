@@ -630,7 +630,6 @@ sb.auth.onAuthStateChange(async (event, session) => {
 (async () => {
   const { data: { session } } = await sb.auth.getSession();
   if (session) {
-    loading(false);
     currentUser = session.user;
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('app-screen').style.display = 'block';
